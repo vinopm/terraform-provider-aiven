@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"github.com/aiven/aiven-go-client"
-	"github.com/aiven/terraform-provider-aiven/pkg/ipfilter"
-	"github.com/aiven/terraform-provider-aiven/pkg/service"
+	"github.com/aiven/terraform-provider-aiven/aiven/internal/schemautil"
+
+	"github.com/aiven/terraform-provider-aiven/aiven/internal/service"
+	"github.com/aiven/terraform-provider-aiven/aiven/internal/uconf"
+
 	"github.com/docker/go-units"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
@@ -112,7 +115,7 @@ func serviceCommonSchema() map[string]*schema.Schema {
 			Type:         schema.TypeString,
 			Optional:     true,
 			Description:  "The disk space of the service, possible values depend on the service type, the cloud provider and the project. Reducing will result in the service rebalancing.",
-			ValidateFunc: validateHumanByteSizeString,
+			ValidateFunc: schemautil.ValidateHumanByteSizeString,
 		},
 		"disk_space_used": {
 			Type:        schema.TypeString,
@@ -183,6 +186,15 @@ func serviceCommonSchema() map[string]*schema.Schema {
 						Description: "Type of the service integration. The only supported value at the moment is `read_replica`",
 					},
 				},
+			},
+		},
+		"static_ips": {
+			Type:             schema.TypeList,
+			Optional:         true,
+			Description:      "Static IPs that are going to be associated with this service during creation",
+			DiffSuppressFunc: schemautil.CreateOnlyDiffSuppressFunc,
+			Elem: &schema.Schema{
+				Type: schema.TypeString,
 			},
 		},
 		"components": {
@@ -295,8 +307,8 @@ var aivenServiceSchema = map[string]*schema.Schema{
 		Type:             schema.TypeString,
 		Optional:         true,
 		Description:      "The disk space of the service, possible values depend on the service type, the cloud provider and the project. Reducing will result in the service rebalancing.",
-		DiffSuppressFunc: emptyObjectDiffSuppressFunc,
-		ValidateFunc:     validateHumanByteSizeString,
+		DiffSuppressFunc: schemautil.EmptyObjectDiffSuppressFunc,
+		ValidateFunc:     schemautil.ValidateHumanByteSizeString,
 	},
 	"disk_space_default": {
 		Type:        schema.TypeString,
@@ -341,6 +353,15 @@ var aivenServiceSchema = map[string]*schema.Schema{
 					Description: "Type of the service integration. The only supported value at the moment is 'read_replica'",
 				},
 			},
+		},
+	},
+	"static_ips": {
+		Type:             schema.TypeList,
+		Optional:         true,
+		Description:      "Static IPs that are going to be associated with this service during creation",
+		DiffSuppressFunc: schemautil.CreateOnlyDiffSuppressFunc,
+		Elem: &schema.Schema{
+			Type: schema.TypeString,
 		},
 	},
 	"components": {
@@ -420,7 +441,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			Schema: map[string]*schema.Schema{},
 		},
 	},
-	"cassandra_user_config": generateServiceUserConfiguration(ServiceTypeCassandra),
+	"cassandra_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeCassandra),
 	"elasticsearch": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -436,7 +457,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			},
 		},
 	},
-	"elasticsearch_user_config": generateServiceUserConfiguration(ServiceTypeElasticsearch),
+	"elasticsearch_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeElasticsearch),
 	"opensearch": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -452,7 +473,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			},
 		},
 	},
-	"opensearch_user_config": generateServiceUserConfiguration(ServiceTypeOpensearch),
+	"opensearch_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeOpensearch),
 	"grafana": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -461,7 +482,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			Schema: map[string]*schema.Schema{},
 		},
 	},
-	"grafana_user_config": generateServiceUserConfiguration(ServiceTypeGrafana),
+	"grafana_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeGrafana),
 	"influxdb": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -476,7 +497,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			},
 		},
 	},
-	"influxdb_user_config": generateServiceUserConfiguration(ServiceTypeInfluxDB),
+	"influxdb_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeInfluxDB),
 	"kafka": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -522,7 +543,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			},
 		},
 	},
-	"kafka_user_config": generateServiceUserConfiguration(ServiceTypeKafka),
+	"kafka_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeKafka),
 	"kafka_connect": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -531,7 +552,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			Schema: map[string]*schema.Schema{},
 		},
 	},
-	"kafka_connect_user_config": generateServiceUserConfiguration(ServiceTypeKafkaConnect),
+	"kafka_connect_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeKafkaConnect),
 	"mysql": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -540,7 +561,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			Schema: map[string]*schema.Schema{},
 		},
 	},
-	"mysql_user_config": generateServiceUserConfiguration(ServiceTypeMySQL),
+	"mysql_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeMySQL),
 	"kafka_mirrormaker": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -549,7 +570,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			Schema: map[string]*schema.Schema{},
 		},
 	},
-	"kafka_mirrormaker_user_config": generateServiceUserConfiguration(ServiceTypeKafkaMirrormaker),
+	"kafka_mirrormaker_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeKafkaMirrormaker),
 	"pg": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -603,7 +624,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			},
 		},
 	},
-	"pg_user_config": generateServiceUserConfiguration(ServiceTypePG),
+	"pg_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypePG),
 	"redis": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -612,7 +633,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			Schema: map[string]*schema.Schema{},
 		},
 	},
-	"redis_user_config": generateServiceUserConfiguration(ServiceTypeRedis),
+	"redis_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeRedis),
 	"clickhouse": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -621,7 +642,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			Schema: map[string]*schema.Schema{},
 		},
 	},
-	"clickhouse_user_config": generateServiceUserConfiguration(ServiceTypeClickhouse),
+	"clickhouse_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeClickhouse),
 	"flink": {
 		Type:        schema.TypeList,
 		Computed:    true,
@@ -641,7 +662,7 @@ var aivenServiceSchema = map[string]*schema.Schema{
 			},
 		},
 	},
-	"flink_user_config": generateServiceUserConfiguration(ServiceTypeFlink),
+	"flink_user_config": service.GenerateServiceUserConfigurationSchema(ServiceTypeFlink),
 }
 
 func resourceService() *schema.Resource {
@@ -663,6 +684,7 @@ func resourceService() *schema.Resource {
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(20 * time.Minute),
 			Update: schema.DefaultTimeout(20 * time.Minute),
+			Delete: schema.DefaultTimeout(20 * time.Minute),
 		},
 		Schema: aivenServiceSchema,
 	}
@@ -731,7 +753,7 @@ func resourceServiceCreateWrapper(serviceType string) schema.CreateContextFunc {
 func resourceServiceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*aiven.Client)
 
-	projectName, serviceName := splitResourceID2(d.Id())
+	projectName, serviceName := schemautil.SplitResourceID2(d.Id())
 	s, err := client.Services.Get(projectName, serviceName)
 	if err != nil {
 		if err = resourceReadHandleNotFound(err, d); err != nil {
@@ -766,7 +788,7 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, m interf
 		diskSpace = service.ConvertToDiskSpaceMB(ds.(string))
 	}
 
-	if _, err := client.Services.Create(
+	_, err := client.Services.Create(
 		project,
 		aiven.CreateServiceRequest{
 			Cloud:                 d.Get("cloud_name").(string),
@@ -778,18 +800,20 @@ func resourceServiceCreate(ctx context.Context, d *schema.ResourceData, m interf
 			ServiceType:           serviceType,
 			TerminationProtection: d.Get("termination_protection").(bool),
 			DiskSpaceMB:           diskSpace,
-			UserConfig:            ConvertTerraformUserConfigToAPICompatibleFormat("service", serviceType, true, d),
+			UserConfig:            uconf.ConvertTerraformUserConfigToAPICompatibleFormat("service", serviceType, true, d),
+			StaticIPs:             schemautil.FlattenToString(d.Get("static_ips").([]interface{})),
 		},
-	); err != nil {
-		return diag.FromErr(err)
-	}
-
-	s, err := resourceServiceWait(ctx, d, m, "create")
+	)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	d.SetId(buildResourceID(project, s.Name))
+	s, err := service.WaitForCreation(ctx, d, m)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	d.SetId(schemautil.BuildResourceID(project, s.Name))
 
 	return resourceServiceRead(ctx, d, m)
 }
@@ -811,7 +835,7 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, m interf
 		return diag.FromErr(err)
 	}
 
-	projectName, serviceName := splitResourceID2(d.Id())
+	projectName, serviceName := schemautil.SplitResourceID2(d.Id())
 
 	if _, err := client.Services.Update(
 		projectName,
@@ -825,13 +849,13 @@ func resourceServiceUpdate(ctx context.Context, d *schema.ResourceData, m interf
 			TerminationProtection: d.Get("termination_protection").(bool),
 			DiskSpaceMB:           diskSpace,
 			Karapace:              karapace,
-			UserConfig:            ConvertTerraformUserConfigToAPICompatibleFormat("service", d.Get("service_type").(string), false, d),
+			UserConfig:            uconf.ConvertTerraformUserConfigToAPICompatibleFormat("service", d.Get("service_type").(string), false, d),
 		},
 	); err != nil {
 		return diag.FromErr(err)
 	}
 
-	if _, err := resourceServiceWait(ctx, d, m, "update"); err != nil {
+	if _, err := service.WaitForUpdate(ctx, d, m); err != nil {
 		return diag.FromErr(err)
 	}
 
@@ -855,13 +879,16 @@ func getDefaultDiskSpaceIfNotSet(ctx context.Context, d *schema.ResourceData, cl
 	return diskSpace, nil
 }
 
-func resourceServiceDelete(_ context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+func resourceServiceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*aiven.Client)
 
-	projectName, serviceName := splitResourceID2(d.Id())
+	projectName, serviceName := schemautil.SplitResourceID2(d.Id())
 
-	err := client.Services.Delete(projectName, serviceName)
-	if err != nil && !aiven.IsNotFound(err) {
+	if err := client.Services.Delete(projectName, serviceName); err != nil && !aiven.IsNotFound(err) {
+		return diag.FromErr(err)
+	}
+
+	if err := service.WaitForDeletion(ctx, d, m); err != nil {
 		return diag.FromErr(err)
 	}
 
@@ -875,7 +902,7 @@ func resourceServiceState(ctx context.Context, d *schema.ResourceData, m interfa
 		return nil, fmt.Errorf("invalid identifier %v, expected <project_name>/<service_name>", d.Id())
 	}
 
-	projectName, serviceName := splitResourceID2(d.Id())
+	projectName, serviceName := schemautil.SplitResourceID2(d.Id())
 	s, err := client.Services.Get(projectName, serviceName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to GET service %s: %s", d.Id(), err)
@@ -891,29 +918,6 @@ func resourceServiceState(ctx context.Context, d *schema.ResourceData, m interfa
 	}
 
 	return []*schema.ResourceData{d}, nil
-}
-
-func resourceServiceWait(ctx context.Context, d *schema.ResourceData, m interface{}, operation string) (*aiven.Service, error) {
-	var timeout time.Duration
-	if operation == "create" {
-		timeout = d.Timeout(schema.TimeoutCreate)
-	} else {
-		timeout = d.Timeout(schema.TimeoutUpdate)
-	}
-
-	w := &ServiceChangeWaiter{
-		Client:      m.(*aiven.Client),
-		Operation:   operation,
-		Project:     d.Get("project").(string),
-		ServiceName: d.Get("service_name").(string),
-	}
-
-	s, err := w.Conf(timeout).WaitForStateContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error waiting for Aiven service to be RUNNING: %s", err)
-	}
-
-	return s.(*aiven.Service), nil
 }
 
 func copyServicePropertiesFromAPIResponseToTerraform(
@@ -971,16 +975,13 @@ func copyServicePropertiesFromAPIResponseToTerraform(
 	}
 
 	if s.ProjectVPCID != nil {
-		if err := d.Set("project_vpc_id", buildResourceID(project, *s.ProjectVPCID)); err != nil {
+		if err := d.Set("project_vpc_id", schemautil.BuildResourceID(project, *s.ProjectVPCID)); err != nil {
 			return err
 		}
 	}
-	userConfig := ConvertAPIUserConfigToTerraformCompatibleFormat(
-		"service", serviceType, s.UserConfig)
-	if err := d.Set(serviceType+"_user_config",
-		ipfilter.Normalize(d.Get(serviceType+"_user_config"), userConfig)); err != nil {
-		return fmt.Errorf("cannot set `%s_user_config` : %s;"+
-			"Please make sure that all Aiven services have unique s names", serviceType, err)
+	userConfig := uconf.ConvertAPIUserConfigToTerraformCompatibleFormat("service", serviceType, s.UserConfig)
+	if err := d.Set(serviceType+"_user_config", uconf.NormalizeIpFilter(d.Get(serviceType+"_user_config"), userConfig)); err != nil {
+		return fmt.Errorf("cannot set `%s_user_config` : %s; Please make sure that all Aiven services have unique s names", serviceType, err)
 	}
 
 	params := s.URIParams
