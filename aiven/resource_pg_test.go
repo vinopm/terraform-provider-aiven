@@ -237,44 +237,44 @@ func TestAccAiven_pg(t *testing.T) {
 func testAccPGWithStaticIP(name string) string {
 	return fmt.Sprintf(`
 		data "aiven_project" "foo" {
-			project = "%s"
+		  project = "%s"
 		}
-
-    resource "aiven_static_ip" "ip1" {
-      project = data.aiven_project.foo.project
-      cloud_name = "google-europe-west1"
-    }
-
-    resource "aiven_static_ip" "ip2" {
-      project = data.aiven_project.foo.project
-      cloud_name = "google-europe-west1"
-    }
-
+		
+		resource "aiven_static_ip" "ip1" {
+		  project    = data.aiven_project.foo.project
+		  cloud_name = "google-europe-west1"
+		}
+		
+		resource "aiven_static_ip" "ip2" {
+		  project    = data.aiven_project.foo.project
+		  cloud_name = "google-europe-west1"
+		}
+		
 		resource "aiven_pg" "bar" {
-			project = data.aiven_project.foo.project
-			cloud_name = "google-europe-west1"
-			plan = "startup-4"
-			service_name = "test-acc-sr-%s"
-			maintenance_window_dow = "monday"
-			maintenance_window_time = "10:00:00"
-
-      static_ips = [
-        aiven_static_ip.ip1.static_ip_address_id,
-        aiven_static_ip.ip2.static_ip_address_id
-      ]
-
-			pg_user_config {
-        static_ips = true
-			}
-    }
-
-    data "aiven_pg" "service" {
-      service_name = aiven_pg.bar.service_name
-      project = aiven_pg.bar.project
-
-      depends_on = [aiven_pg.bar]
-    }
-    `, os.Getenv("AIVEN_PROJECT_NAME"), name)
+		  project                 = data.aiven_project.foo.project
+		  cloud_name              = "google-europe-west1"
+		  plan                    = "startup-4"
+		  service_name            = "test-acc-sr-%s"
+		  maintenance_window_dow  = "monday"
+		  maintenance_window_time = "10:00:00"
+		
+		  static_ips = [
+		    aiven_static_ip.ip1.static_ip_address_id,
+		    aiven_static_ip.ip2.static_ip_address_id
+		  ]
+		
+		  pg_user_config {
+		    static_ips = true
+		  }
+		}
+		
+		data "aiven_pg" "service" {
+		  service_name = aiven_pg.bar.service_name
+		  project      = aiven_pg.bar.project
+		
+		  depends_on = [aiven_pg.bar]
+		}`,
+		os.Getenv("AIVEN_PROJECT_NAME"), name)
 }
 
 func testAccPGResourceWithDiskSize(name, diskSize string) string {
