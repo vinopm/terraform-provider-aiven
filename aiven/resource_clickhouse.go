@@ -4,7 +4,8 @@ package aiven
 import (
 	"time"
 
-	"github.com/aiven/terraform-provider-aiven/pkg/service"
+	"github.com/aiven/terraform-provider-aiven/aiven/internal/service"
+
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
