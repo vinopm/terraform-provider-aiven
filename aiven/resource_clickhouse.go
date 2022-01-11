@@ -20,7 +20,7 @@ func clickhouseSchema() map[string]*schema.Schema {
 			Schema: map[string]*schema.Schema{},
 		},
 	}
-	s[ServiceTypeClickhouse+"_user_config"] = generateServiceUserConfiguration(ServiceTypeClickhouse)
+	s[ServiceTypeClickhouse+"_user_config"] = service.GenerateServiceUserConfigurationSchema(ServiceTypeClickhouse)
 
 	return s
 }
